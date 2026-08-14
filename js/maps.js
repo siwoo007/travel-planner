@@ -152,6 +152,20 @@ const Maps = (() => {
 
   /* ---------- 구글맵 딥링크 ---------- */
 
+  /* ---------- 구글맵 임베드 (무료·무제한) ----------
+     경로 API가 대중교통을 제공하지 않는 지역(일본 등)에서
+     구글맵 화면을 그대로 앱 안에 띄워 대중교통 경로를 보여줍니다. */
+
+  function embedDirections(o, d, mode) {
+    const m = { TRANSIT: "transit", WALKING: "walking", DRIVING: "driving" }[mode] || "transit";
+    const enc = p => (p.lat && p.lng) ? (p.lat + "," + p.lng)
+                                      : encodeURIComponent(p.place || p.name || p.title || "");
+    return "https://www.google.com/maps/embed/v1/directions"
+         + "?key=" + APP_CONFIG.mapsApiKey
+         + "&origin=" + enc(o) + "&destination=" + enc(d)
+         + "&mode=" + m + "&language=ko";
+  }
+
   function mapsLink(o, d, mode) {
     const m = { TRANSIT: "transit", WALKING: "walking", DRIVING: "driving" }[mode] || "transit";
     const enc = p => (p.lat && p.lng) ? (p.lat + "," + p.lng) : encodeURIComponent(p.name || "");
@@ -159,5 +173,6 @@ const Maps = (() => {
          + "&destination=" + enc(d) + "&travelmode=" + m;
   }
 
-  return { hasKey, load, whenReady, getRouteSummary, getRouteFull, parseSteps, drawRoute, attachAutocomplete, mapsLink };
+  return { hasKey, load, whenReady, getRouteSummary, getRouteFull, parseSteps, drawRoute,
+           attachAutocomplete, mapsLink, embedDirections };
 })();

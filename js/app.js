@@ -383,21 +383,44 @@ const App = (() => {
         icon("transit") + '이동 경로<span class="go">구글맵에서 보기</span></a>';
     }
     return '<button class="transit" id="tr-' + idx + '" onclick="App.openRoute(\'' + a.id + "','" + b.id + '\')">' +
-      icon("transit") + '<span id="tr-txt-' + idx + '">이동 시간 확인 중…</span><span class="go">경로 보기</span></button>';
+      '<span id="tr-ico-' + idx + '">' + icon("transit") + "</span>" +
+      '<span id="tr-txt-' + idx + '">이동 시간 확인 중…</span><span class="go">경로 보기</span></button>';
+  }
+
+  // "1시간 20분" → 80
+  function parseMinutes(t) {
+    if (!t) return 9999;
+    const h = /(\d+)\s*시간/.exec(t), m = /(\d+)\s*분/.exec(t);
+    return (h ? +h[1] * 60 : 0) + (m ? +m[1] : 0);
+  }
+
+  const MODE_LABEL = { TRANSIT: "대중교통", WALKING: "도보", DRIVING: "차량" };
+  const MODE_ICON = { TRANSIT: "transit", WALKING: "walk", DRIVING: "car" };
+
+  // 대중교통 → (없으면) 도보 → (멀면) 차량 순으로 자동 대체
+  // 일본 등 일부 국가는 구글 지도 API가 대중교통 정보를 제공하지 않습니다.
+  function bestRoute(o, d) {
+    return Maps.getRouteSummary(o, d, "TRANSIT").then(t => {
+      if (t && !t.none) return t;
+      return Maps.getRouteSummary(o, d, "WALKING").then(w => {
+        if (w && !w.none && parseMinutes(w.duration) <= 25) return w;
+        return Maps.getRouteSummary(o, d, "DRIVING").then(c => (c && !c.none) ? c : w);
+      });
+    });
   }
 
   function fetchTransits(items) {
     items.forEach((a, idx) => {
       const b = items[idx + 1];
       if (!b || !(a.lat && a.lng && b.lat && b.lng) || !Maps.hasKey()) return;
-      Maps.getRouteSummary({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }, "TRANSIT")
-        .then(sum => {
-          const el = $("tr-txt-" + idx);
-          if (!el) return;
-          if (!sum) { el.textContent = "이동 정보를 불러오지 못했어요"; return; }
-          if (sum.none) { el.textContent = "대중교통 경로 없음"; return; }
-          el.textContent = "대중교통 " + sum.duration + (sum.fare ? " · " + sum.fare : "");
-        });
+      bestRoute({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }).then(sum => {
+        const el = $("tr-txt-" + idx), ic = $("tr-ico-" + idx);
+        if (!el) return;
+        if (!sum || sum.none) { el.textContent = "이동 정보 없음"; return; }
+        if (ic) ic.innerHTML = icon(MODE_ICON[sum.mode] || "transit");
+        el.textContent = (MODE_LABEL[sum.mode] || "") + " " + sum.duration +
+          (sum.fare ? " · " + sum.fare : (sum.distance ? " · " + sum.distance : ""));
+      });
     });
   }
 
@@ -412,6 +435,16 @@ const App = (() => {
     const ov = $("route-overlay");
     ov.classList.remove("hidden");
     renderRoute(a, b);
+  }
+
+  // 지도 자리에 구글맵 화면을 그대로 띄움 (Maps Embed API — 무료·무제한)
+  function showEmbed(a, b, mode) {
+    const el = $("ro-map");
+    if (!el) return;
+    el.style.height = "440px";
+    el.innerHTML = '<iframe src="' + esc(Maps.embedDirections(a, b, mode)) + '" ' +
+      'style="width:100%; height:100%; border:0" loading="lazy" allowfullscreen ' +
+      'referrerpolicy="strict-origin-when-cross-origin"></iframe>';
   }
 
   function renderRoute(a, b) {
@@ -433,7 +466,17 @@ const App = (() => {
       const det = $("ro-detail");
       if (!det) return;
       if (!res) {
-        det.innerHTML = '<div class="empty" style="padding:24px 0">이 수단의 경로를 찾지 못했어요</div>';
+        if (U.routeMode === "TRANSIT") {
+          // 경로 API가 대중교통을 제공하지 않는 지역 → 구글맵 화면을 그대로 임베드
+          showEmbed(a, b, "TRANSIT");
+          det.innerHTML =
+            '<div class="label" style="margin-bottom:6px">구글 지도 대중교통 경로</div>' +
+            '<div style="font-size:13px; color:var(--text2); line-height:1.6">' +
+            '위 지도에서 출발 시각, 환승, 소요 시간을 확인할 수 있어요.<br>' +
+            '더 자세히 보려면 아래 <b>구글맵 앱에서 열기</b>를 누르세요.</div>';
+        } else {
+          det.innerHTML = '<div class="empty" style="padding:24px 0">이 수단의 경로를 찾지 못했어요</div>';
+        }
         return;
       }
       Maps.drawRoute($("ro-map"), res);
