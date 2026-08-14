@@ -15,8 +15,9 @@
 
 window.APP_CONFIG = {
 
-  // [1] 구글맵 API 키 — 따옴표 안에 붙여넣기 (아직 없으면 그대로 두세요)
-  mapsApiKey: "",
+  // [1] 구글맵 API 키 — 연결 완료
+  //     (siwoo007.github.io 에서만 작동하도록 제한되어 있습니다)
+  mapsApiKey: "AIzaSyAanljvcXcc6NhLdCh12WSEBBiGxgar6Hc",
 
   // [2] Firebase 설정 — 연결 완료
   firebase: {
